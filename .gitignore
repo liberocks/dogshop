@@ -1,0 +1,5 @@
+.env
+.env.dogshop
+.state/
+.DS_Store
+sources/

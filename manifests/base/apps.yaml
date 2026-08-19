@@ -1,0 +1,707 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: dogshop
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: dogshop
+    tags.datadoghq.com/service: dogshop-db
+    tags.datadoghq.com/env: ${DD_ENV}
+    tags.datadoghq.com/version: ${DD_VERSION}
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: dogshop
+        tags.datadoghq.com/service: dogshop-db
+        tags.datadoghq.com/env: ${DD_ENV}
+        tags.datadoghq.com/version: ${DD_VERSION}
+      annotations:
+        ad.datadoghq.com/postgres.logs: '[{"source":"postgresql","service":"dogshop-db","auto_multi_line_detection":true}]'
+        ad.datadoghq.com/postgres.checks: '{"postgres":{"init_config":{},"instances":[{"host":"%%host%%","port":5432,"username":"datadog","password":"datadog"}]}}'
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: postgres
+          image: ghcr.io/datadog/storedog/postgres@sha256:4909566c7717f87583227df4875e0fe650042d2a024a86028e01067bace80bb6
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: dogshop-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dogshop-secrets
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              cpu: 150m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          readinessProbe:
+            tcpSocket:
+              port: postgres
+            initialDelaySeconds: 10
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 3Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: dogshop
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: dogshop
+    tags.datadoghq.com/service: dogshop-redis
+    tags.datadoghq.com/env: ${DD_ENV}
+    tags.datadoghq.com/version: "6.2"
+spec:
+  serviceName: redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redis
+        app.kubernetes.io/component: cache
+        app.kubernetes.io/part-of: dogshop
+        tags.datadoghq.com/service: dogshop-redis
+        tags.datadoghq.com/env: ${DD_ENV}
+        tags.datadoghq.com/version: "6.2"
+      annotations:
+        ad.datadoghq.com/redis.logs: '[{"source":"redis","service":"dogshop-redis"}]'
+        ad.datadoghq.com/redis.checks: '{"redisdb":{"init_config":{},"instances":[{"host":"%%host%%","port":6379}]}}'
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: redis
+          image: redis@sha256:ec5e187c913d422cdf60f4216a5fdfb95246792c6de6fe21ff5bed75cbfc8c23
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: redis
+              containerPort: 6379
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          readinessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 5
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: dogshop
+spec:
+  selector:
+    app.kubernetes.io/name: backend
+  ports:
+    - name: http
+      port: 4000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: dogshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backend
+        app.kubernetes.io/component: api
+        app.kubernetes.io/part-of: dogshop
+        tags.datadoghq.com/service: dogshop-backend
+        tags.datadoghq.com/env: ${DD_ENV}
+        tags.datadoghq.com/version: ${DD_VERSION}
+      annotations:
+        ad.datadoghq.com/backend.logs: '[{"source":"ruby","service":"dogshop-backend","auto_multi_line_detection":true}]'
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      initContainers:
+        - name: wait-for-db
+          image: busybox@sha256:9db7b59979c38555a39def84a31fb98b5296952f9e3afd4f6f11f05b07adfab0
+          command: [sh, -c, 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done']
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 50m, memory: 32Mi}
+      containers:
+        - name: backend
+          image: ghcr.io/datadog/storedog/backend@sha256:1f4eaef99404ea87a1f294d0ef88692a3a111a0000a2d2279fb8727cd39d9af6
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 4000
+          env:
+            - name: REDIS_URL
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: REDIS_URL}}
+            - name: DB_HOST
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: DB_HOST}}
+            - name: DB_PORT
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: DB_PORT}}
+            - name: POSTGRES_USER
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: POSTGRES_USER}}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: dogshop-secrets, key: POSTGRES_PASSWORD}}
+            - name: RAILS_ENV
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: RAILS_ENV}}
+            - name: DB_POOL
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: DB_POOL}}
+            - name: MAX_THREADS
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: MAX_THREADS}}
+            - name: DD_ENV
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/env']"}}
+            - name: DD_SERVICE
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/service']"}}
+            - name: DD_VERSION
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/version']"}}
+            - name: DD_AGENT_HOST
+              value: dogshop-agent.datadog.svc
+            - name: DD_RUNTIME_METRICS_ENABLED
+              value: "true"
+            - name: DD_PROFILING_ENABLED
+              value: "true"
+          resources:
+            requests: {cpu: 200m, memory: 512Mi}
+            limits: {cpu: 500m, memory: 1Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  labels:
+    app.kubernetes.io/name: worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: dogshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: worker
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/part-of: dogshop
+        tags.datadoghq.com/service: dogshop-worker
+        tags.datadoghq.com/env: ${DD_ENV}
+        tags.datadoghq.com/version: ${DD_VERSION}
+      annotations:
+        ad.datadoghq.com/worker.logs: '[{"source":"ruby","service":"dogshop-worker","auto_multi_line_detection":true}]'
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      initContainers:
+        - name: wait-for-db
+          image: busybox@sha256:9db7b59979c38555a39def84a31fb98b5296952f9e3afd4f6f11f05b07adfab0
+          command: [sh, -c, 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done']
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 50m, memory: 32Mi}
+      containers:
+        - name: worker
+          image: ghcr.io/datadog/storedog/backend@sha256:1f4eaef99404ea87a1f294d0ef88692a3a111a0000a2d2279fb8727cd39d9af6
+          imagePullPolicy: IfNotPresent
+          command: [bundle, exec, sidekiq, -C, config/sidekiq.yml]
+          env:
+            - name: WORKER
+              value: "true"
+            - name: REDIS_URL
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: REDIS_URL}}
+            - name: DB_HOST
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: DB_HOST}}
+            - name: DB_PORT
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: DB_PORT}}
+            - name: POSTGRES_USER
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: POSTGRES_USER}}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: dogshop-secrets, key: POSTGRES_PASSWORD}}
+            - name: DB_POOL
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: DB_POOL}}
+            - name: MAX_THREADS
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: MAX_THREADS}}
+            - name: DD_ENV
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/env']"}}
+            - name: DD_SERVICE
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/service']"}}
+            - name: DD_VERSION
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/version']"}}
+            - name: DD_AGENT_HOST
+              value: dogshop-agent.datadog.svc
+            - name: DD_RUNTIME_METRICS_ENABLED
+              value: "true"
+            - name: DD_PROFILING_ENABLED
+              value: "true"
+          resources:
+            requests: {cpu: 150m, memory: 384Mi}
+            limits: {cpu: 400m, memory: 768Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ads
+  labels:
+    app.kubernetes.io/name: ads
+    app.kubernetes.io/component: advertisements
+    app.kubernetes.io/part-of: dogshop
+spec:
+  selector:
+    app.kubernetes.io/name: ads
+  ports:
+    - name: http
+      port: 3030
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ads
+  labels:
+    app.kubernetes.io/name: ads
+    app.kubernetes.io/component: advertisements
+    app.kubernetes.io/part-of: dogshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ads
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ads
+        app.kubernetes.io/component: advertisements
+        app.kubernetes.io/part-of: dogshop
+        tags.datadoghq.com/service: dogshop-ads
+        tags.datadoghq.com/env: ${DD_ENV}
+        tags.datadoghq.com/version: ${DD_VERSION}
+      annotations:
+        ad.datadoghq.com/ads.logs: '[{"source":"java","service":"dogshop-ads"}]'
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: ads
+          image: ghcr.io/datadog/storedog/ads-java@sha256:6fc8aa1d4e26048502f2e4a69092be1a07e5259f558c4f080c98e1d18a4caf42
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3030
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: dogshop-secrets, key: POSTGRES_PASSWORD}}
+            - name: POSTGRES_USER
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: POSTGRES_USER}}
+            - name: POSTGRES_HOST
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: DB_HOST}}
+            - name: DD_ENV
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/env']"}}
+            - name: DD_SERVICE
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/service']"}}
+            - name: DD_VERSION
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/version']"}}
+            - name: DD_AGENT_HOST
+              value: dogshop-agent.datadog.svc
+          resources:
+            requests: {cpu: 150m, memory: 384Mi}
+            limits: {cpu: 400m, memory: 768Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discounts
+  labels:
+    app.kubernetes.io/name: discounts
+    app.kubernetes.io/component: discounts
+    app.kubernetes.io/part-of: dogshop
+spec:
+  selector:
+    app.kubernetes.io/name: discounts
+  ports:
+    - name: http
+      port: 2814
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discounts
+  labels:
+    app.kubernetes.io/name: discounts
+    app.kubernetes.io/component: discounts
+    app.kubernetes.io/part-of: dogshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: discounts
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: discounts
+        app.kubernetes.io/component: discounts
+        app.kubernetes.io/part-of: dogshop
+        tags.datadoghq.com/service: dogshop-discounts
+        tags.datadoghq.com/env: ${DD_ENV}
+        tags.datadoghq.com/version: ${DD_VERSION}
+      annotations:
+        ad.datadoghq.com/discounts.logs: '[{"source":"python","service":"dogshop-discounts"}]'
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      initContainers:
+        - name: wait-for-db
+          image: busybox@sha256:9db7b59979c38555a39def84a31fb98b5296952f9e3afd4f6f11f05b07adfab0
+          command: [sh, -c, 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done']
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 50m, memory: 32Mi}
+      containers:
+        - name: discounts
+          image: ghcr.io/datadog/storedog/discounts@sha256:6c77da24188c353061e730644b7957f54c94a12274b897e394bd791d098598e6
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 2814
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: dogshop-secrets, key: POSTGRES_PASSWORD}}
+            - name: POSTGRES_USER
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: POSTGRES_USER}}
+            - name: POSTGRES_HOST
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: DB_HOST}}
+            - name: DD_ENV
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/env']"}}
+            - name: DD_SERVICE
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/service']"}}
+            - name: DD_VERSION
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/version']"}}
+            - name: DD_AGENT_HOST
+              value: dogshop-agent.datadog.svc
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {cpu: 250m, memory: 384Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: dogshop
+spec:
+  # The frontend and proxy call each other during startup, before either root
+  # probe can succeed. Keep their internal endpoints available for that phase.
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: frontend
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: dogshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: frontend
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/part-of: dogshop
+        tags.datadoghq.com/service: dogshop-frontend
+        tags.datadoghq.com/env: ${DD_ENV}
+        tags.datadoghq.com/version: ${DD_VERSION}
+      annotations:
+        ad.datadoghq.com/frontend.logs: '[{"source":"nodejs","service":"dogshop-frontend","auto_multi_line_detection":true}]'
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      initContainers:
+        - name: wait-for-backend
+          image: busybox:1.37.0
+          command: [sh, -c, 'until nc -z backend 4000; do echo waiting for backend; sleep 2; done']
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 50m, memory: 32Mi}
+      containers:
+        - name: frontend
+          image: ghcr.io/datadog/storedog/frontend@sha256:427dee692fe7d06152951d5a5ccccf4f687f0f6e084d46bc49ac78eeb6f5dee3
+          imagePullPolicy: IfNotPresent
+          command: [npm, run, prod]
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_ADS_ROUTE
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: NEXT_PUBLIC_ADS_ROUTE}}
+            - name: NEXT_PUBLIC_DISCOUNTS_ROUTE
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: NEXT_PUBLIC_DISCOUNTS_ROUTE}}
+            - name: NEXT_PUBLIC_DBM_ROUTE
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: NEXT_PUBLIC_DBM_ROUTE}}
+            - name: NEXT_PUBLIC_FRONTEND_API_ROUTE
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: NEXT_PUBLIC_FRONTEND_API_ROUTE}}
+            - name: NEXT_PUBLIC_SPREE_API_HOST
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: NEXT_PUBLIC_SPREE_API_HOST}}
+            - name: NEXT_PUBLIC_SPREE_CLIENT_HOST
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: NEXT_PUBLIC_SPREE_CLIENT_HOST}}
+            - name: NEXT_PUBLIC_SPREE_IMAGE_HOST
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: NEXT_PUBLIC_SPREE_IMAGE_HOST}}
+            - name: NEXT_PUBLIC_SPREE_ALLOWED_IMAGE_DOMAIN
+              valueFrom: {configMapKeyRef: {name: dogshop-config, key: NEXT_PUBLIC_SPREE_ALLOWED_IMAGE_DOMAIN}}
+            - name: NEXT_PUBLIC_DD_APPLICATION_ID
+              valueFrom: {secretKeyRef: {name: dogshop-rum, key: application-id}}
+            - name: NEXT_PUBLIC_DD_CLIENT_TOKEN
+              valueFrom: {secretKeyRef: {name: dogshop-rum, key: client-token}}
+            - name: NEXT_PUBLIC_DD_SITE
+              valueFrom: {configMapKeyRef: {name: dogshop-runtime, key: DD_SITE}}
+            - name: NEXT_PUBLIC_DD_ENV
+              valueFrom: {configMapKeyRef: {name: dogshop-runtime, key: DD_ENV}}
+            - name: NEXT_PUBLIC_DD_VERSION_FRONTEND
+              valueFrom: {configMapKeyRef: {name: dogshop-runtime, key: DD_VERSION}}
+            - name: NEXT_PUBLIC_DD_SERVICE_FRONTEND
+              value: dogshop-frontend
+            - name: DD_ENV
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/env']"}}
+            - name: DD_SERVICE
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/service']"}}
+            - name: DD_VERSION
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/version']"}}
+            - name: DD_AGENT_HOST
+              value: dogshop-agent.datadog.svc
+            - name: DD_RUNTIME_METRICS_ENABLED
+              value: "true"
+            - name: DD_PROFILING_ENABLED
+              value: "true"
+          resources:
+            requests: {cpu: 150m, memory: 384Mi}
+            limits: {cpu: 500m, memory: 1Gi}
+          startupProbe:
+            httpGet: {path: /, port: http}
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: {path: /, port: http}
+            periodSeconds: 15
+          livenessProbe:
+            httpGet: {path: /, port: http}
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-proxy
+  labels:
+    app.kubernetes.io/name: service-proxy
+    app.kubernetes.io/component: edge
+    app.kubernetes.io/part-of: dogshop
+spec:
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: service-proxy
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-proxy
+  labels:
+    app.kubernetes.io/name: service-proxy
+    app.kubernetes.io/component: edge
+    app.kubernetes.io/part-of: dogshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: service-proxy
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: service-proxy
+        app.kubernetes.io/component: edge
+        app.kubernetes.io/part-of: dogshop
+        tags.datadoghq.com/service: dogshop-proxy
+        tags.datadoghq.com/env: ${DD_ENV}
+        tags.datadoghq.com/version: ${DD_VERSION}
+      annotations:
+        ad.datadoghq.com/service-proxy.logs: '[{"source":"nginx","service":"dogshop-proxy"}]'
+        ad.datadoghq.com/service-proxy.checks: '{"nginx":{"init_config":{},"instances":[{"nginx_status_url":"http://%%host%%:81/nginx_status/"}]}}'
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: service-proxy
+          image: ghcr.io/datadog/storedog/nginx@sha256:258a60810ddc13275cc04959f37bc1af24a1b19ef63d855fab5a42decf678283
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            - name: NGINX_RESOLVER
+              value: kube-dns.kube-system.svc.cluster.local
+            - name: DD_ENV
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/env']"}}
+            - name: DD_SERVICE
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/service']"}}
+            - name: DD_VERSION
+              valueFrom: {fieldRef: {fieldPath: "metadata.labels['tags.datadoghq.com/version']"}}
+            - name: DD_AGENT_HOST
+              value: dogshop-agent.datadog.svc
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {cpu: 200m, memory: 256Mi}
+          readinessProbe:
+            httpGet: {path: /, port: http}
+            initialDelaySeconds: 5
+            periodSeconds: 15
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traffic
+  labels:
+    app.kubernetes.io/name: traffic
+    app.kubernetes.io/component: traffic-generator
+    app.kubernetes.io/part-of: dogshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traffic
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: traffic
+        app.kubernetes.io/component: traffic-generator
+        app.kubernetes.io/part-of: dogshop
+        tags.datadoghq.com/service: dogshop-traffic
+        tags.datadoghq.com/env: ${DD_ENV}
+        tags.datadoghq.com/version: ${DD_VERSION}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: puppeteer
+          image: ghcr.io/datadog/storedog/puppeteer@sha256:7d44e541d78f245e4ff480ce335912b4dd6c8dc16f2fcc69f4029cddd420543d
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: STOREDOG_URL
+              value: http://service-proxy.dogshop.svc.cluster.local
+            - name: PUPPETEER_TIMEOUT
+              value: "30000"
+          resources:
+            requests: {cpu: 150m, memory: 512Mi}
+            limits: {cpu: 500m, memory: 1Gi}
+          securityContext:
+            capabilities:
+              add: [SYS_ADMIN]
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi

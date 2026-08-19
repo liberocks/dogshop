@@ -1,0 +1,47 @@
+# Run from the Dogshop project directory so this relative kubeconfig path is
+# resolved to the generated, ignored .state directory.
+kubeconfig = ".state/dogshop-mcp.kubeconfig"
+cluster_provider_strategy = "disabled"
+toolsets = ["core", "config"]
+validation_enabled = true
+experimental_enable_target_compatibility_tool_filters = true
+confirmation_fallback = "deny"
+list_output = "yaml"
+
+server_instructions = """
+Use this server only for the Minikube Dogshop demonstration. Prefer label
+selector app.kubernetes.io/part-of=dogshop and namespace dogshop. Diagnose
+with resource state, Warning events, logs, and Service endpoints before a
+repair. Before resources_create_or_update, first retrieve the complete
+existing resource and preserve fields you do not intend to change. Verify
+every repair with rollout status and endpoint or readiness checks.
+"""
+
+[[denied_resources]]
+group = ""
+version = "v1"
+kind = "Secret"
+
+[[denied_resources]]
+group = "rbac.authorization.k8s.io"
+version = "v1"
+kind = "Role"
+
+[[denied_resources]]
+group = "rbac.authorization.k8s.io"
+version = "v1"
+kind = "RoleBinding"
+
+[[denied_resources]]
+group = "rbac.authorization.k8s.io"
+version = "v1"
+kind = "ClusterRole"
+
+[[denied_resources]]
+group = "rbac.authorization.k8s.io"
+version = "v1"
+kind = "ClusterRoleBinding"
+
+[[confirmation_rules]]
+destructive = true
+message = "This operation may change or delete a Dogshop resource. Confirm the namespace and verify the intended outcome."

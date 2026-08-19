@@ -1,0 +1,13 @@
+# This is a strategic merge patch. The resulting ImagePullBackOff is visible
+# in pod status and Warning events without changing any source application.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discounts
+  namespace: dogshop
+spec:
+  template:
+    spec:
+      containers:
+        - name: discounts
+          image: ghcr.io/datadog/storedog/discounts:does-not-exist

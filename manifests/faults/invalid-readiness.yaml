@@ -1,0 +1,17 @@
+# The frontend process remains healthy but never becomes Ready. This isolates
+# rollout/probe diagnosis from image and dependency failures.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: dogshop
+spec:
+  template:
+    spec:
+      containers:
+        - name: frontend
+          readinessProbe:
+            httpGet:
+              path: /dogshop-readiness-does-not-exist
+              port: http
+            periodSeconds: 10

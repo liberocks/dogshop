@@ -1,0 +1,27 @@
+# Image Provenance
+
+Dogshop uses published images rather than building or copying application
+source. The deployment manifest pins each image to an OCI image-index digest,
+so Minikube selects the correct Linux architecture without accepting a mutable
+tag.
+
+The source application reference was inspected at:
+
+```text
+storedog commit: 487bbc194eb3da884c1602e71f959b11c77dbc0a
+```
+
+Resolved published image indexes:
+
+```text
+ghcr.io/datadog/storedog/frontend@sha256:427dee692fe7d06152951d5a5ccccf4f687f0f6e084d46bc49ac78eeb6f5dee3
+ghcr.io/datadog/storedog/backend@sha256:1f4eaef99404ea87a1f294d0ef88692a3a111a0000a2d2279fb8727cd39d9af6
+ghcr.io/datadog/storedog/discounts@sha256:6c77da24188c353061e730644b7957f54c94a12274b897e394bd791d098598e6
+ghcr.io/datadog/storedog/ads-java@sha256:6fc8aa1d4e26048502f2e4a69092be1a07e5259f558c4f080c98e1d18a4caf42
+ghcr.io/datadog/storedog/nginx@sha256:258a60810ddc13275cc04959f37bc1af24a1b19ef63d855fab5a42decf678283
+ghcr.io/datadog/storedog/postgres@sha256:4909566c7717f87583227df4875e0fe650042d2a024a86028e01067bace80bb6
+ghcr.io/datadog/storedog/puppeteer@sha256:7d44e541d78f245e4ff480ce335912b4dd6c8dc16f2fcc69f4029cddd420543d
+redis@sha256:ec5e187c913d422cdf60f4216a5fdfb95246792c6de6fe21ff5bed75cbfc8c23
+busybox@sha256:9db7b59979c38555a39def84a31fb98b5296952f9e3afd4f6f11f05b07adfab0
+curlimages/curl@sha256:94e9e444bcba979c2ea12e27ae39bee4cd10bc7041a472c4727a558e213744e6
+```
