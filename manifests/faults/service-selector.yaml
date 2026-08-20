@@ -8,3 +8,7 @@ metadata:
 spec:
   selector:
     app.kubernetes.io/name: ads-broken
+  ports:
+    - name: http
+      port: 3030
+      targetPort: http
