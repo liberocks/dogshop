@@ -11,7 +11,6 @@ spec:
       containers:
         - name: frontend
           readinessProbe:
-            httpGet:
-              path: /dogshop-readiness-does-not-exist
-              port: http
+            tcpSocket:
+              port: 65535
             periodSeconds: 10

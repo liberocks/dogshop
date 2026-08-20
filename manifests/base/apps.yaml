@@ -576,14 +576,14 @@ spec:
             requests: {cpu: 150m, memory: 384Mi}
             limits: {cpu: 500m, memory: 1Gi}
           startupProbe:
-            httpGet: {path: /, port: http}
+            tcpSocket: {port: http}
             failureThreshold: 30
             periodSeconds: 10
           readinessProbe:
-            httpGet: {path: /, port: http}
+            tcpSocket: {port: http}
             periodSeconds: 15
           livenessProbe:
-            httpGet: {path: /, port: http}
+            tcpSocket: {port: http}
             periodSeconds: 30
 ---
 apiVersion: v1
