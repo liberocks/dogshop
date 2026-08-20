@@ -1,0 +1,9 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontFamily': 'Inter, sans-serif', 'primaryColor': '#e8f2ff', 'primaryBorderColor': '#0b5cab', 'primaryTextColor': '#10243e', 'lineColor': '#0b5cab'}}}%%
+flowchart TB
+  Codex[Codex] --> DD[Datadog MCP]
+  Codex --> K8s[Kubernetes MCP]
+  DD --> Telemetry[Logs, metrics, traces, RUM]
+  K8s --> Cluster[Pods, services, events, logs]
+  Telemetry --> Answer[One explained answer]
+  Cluster --> Answer
+  classDef default fill:#e8f2ff,stroke:#0b5cab,stroke-width:2px,color:#10243e,rx:16px,ry:16px;

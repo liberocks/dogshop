@@ -1,0 +1,7 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontFamily': 'Inter, sans-serif', 'primaryColor': '#e8f2ff', 'primaryBorderColor': '#0b5cab', 'primaryTextColor': '#10243e', 'lineColor': '#0b5cab'}}}%%
+flowchart LR
+  Symptom[Ads unavailable] --> Service[Inspect service selector]
+  Service --> Endpoints[No matching endpoints]
+  Endpoints --> Fix[Correct selector]
+  Fix --> Verify[Endpoints and traffic recover]
+  classDef default fill:#e8f2ff,stroke:#0b5cab,stroke-width:2px,color:#10243e,rx:16px,ry:16px;

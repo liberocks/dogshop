@@ -1,0 +1,8 @@
+%%{init: {'theme': 'base', 'themeVariables': {'fontFamily': 'Inter, sans-serif', 'primaryColor': '#e8f2ff', 'primaryBorderColor': '#0b5cab', 'primaryTextColor': '#10243e', 'lineColor': '#0b5cab'}}}%%
+flowchart LR
+  Logs[Logs] --> Engineer[Engineer]
+  Traces[Traces] --> Engineer
+  Metrics[Metrics] --> Engineer
+  Cluster[Cluster state] --> Engineer
+  Engineer --> Question[What is wrong?]
+  classDef default fill:#e8f2ff,stroke:#0b5cab,stroke-width:2px,color:#10243e,rx:16px,ry:16px;
